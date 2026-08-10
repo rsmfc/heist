@@ -1,6 +1,6 @@
 /**
  * Main 3D WebGL Game Scene Orchestrator for Vault Heist
- * Features bright 4-point studio lighting, high visibility, bank vault room architecture, and camera tracking.
+ * Over-the-shoulder behind-the-launcher camera view, looking straight downfield at the bricks.
  */
 
 import * as THREE from 'three';
@@ -41,12 +41,12 @@ export class GameScene {
   private finishTimer: number | null = null;
   private safetyTimer: number | null = null;
 
-  // High-Visibility Side-Isometric Camera Angle
-  private defaultCamPos = new THREE.Vector3(-10.5, 7.5, 17.0);
-  private defaultCamLook = new THREE.Vector3(3.5, 2.5, 0);
-  private targetCamPos = new THREE.Vector3(-10.5, 7.5, 17.0);
-  private targetCamLook = new THREE.Vector3(3.5, 2.5, 0);
-  private currentCamLook = new THREE.Vector3(3.5, 2.5, 0);
+  // Over-the-Shoulder Camera Position (Behind Slingshot looking downfield at z = -14)
+  private defaultCamPos = new THREE.Vector3(0, 3.8, 15.5);
+  private defaultCamLook = new THREE.Vector3(0, 2.5, -14.0);
+  private targetCamPos = new THREE.Vector3(0, 3.8, 15.5);
+  private targetCamLook = new THREE.Vector3(0, 2.5, -14.0);
+  private currentCamLook = new THREE.Vector3(0, 2.5, -14.0);
 
   // Screen Shake Intensity
   private shakeIntensity: number = 0;
@@ -73,7 +73,7 @@ export class GameScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // 2. Scene & Camera Setup (Bright Slate Navy BG, NO pitch black!)
+    // 2. Scene & Camera Setup (Bright Navy Slate BG)
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x111827);
 
@@ -103,70 +103,68 @@ export class GameScene {
   }
 
   private setupEnvironment(): void {
-    // 1. Polished Cyber Floor Tiles with Glowing Cyan Grid
-    const floorGeom = new THREE.PlaneGeometry(80, 60);
+    // 1. Polished Cyber Floor Tiles Extending Downfield (z = 20 to z = -35)
+    const floorGeom = new THREE.PlaneGeometry(50, 70);
     const floorMesh = new THREE.Mesh(floorGeom, this.materials.floor);
     floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.set(5, 0, 0);
+    floorMesh.position.set(0, 0, -5);
     floorMesh.receiveShadow = true;
     this.scene.add(floorMesh);
 
-    // Floor Grid Overlay
-    const floorGrid = new THREE.GridHelper(80, 40, 0x00ffff, 0x1e293b);
-    floorGrid.position.set(5, 0.02, 0);
+    // Floor Grid Lines Running Downfield
+    const floorGrid = new THREE.GridHelper(70, 35, 0x00ffff, 0x1e293b);
+    floorGrid.position.set(0, 0.02, -5);
     this.scene.add(floorGrid);
 
-    // 2. Heavy Metallic Bank Vault Door Wall (at x = 20)
-    const backWallGeom = new THREE.PlaneGeometry(60, 30);
+    // 2. Far Back Bank Vault Wall & Door (at z = -25.0)
+    const backWallGeom = new THREE.PlaneGeometry(50, 30);
     const backWallMesh = new THREE.Mesh(backWallGeom, this.materials.wall);
-    backWallMesh.rotation.y = -Math.PI / 2;
-    backWallMesh.position.set(20, 15, 0);
+    backWallMesh.position.set(0, 15, -25);
     backWallMesh.receiveShadow = true;
     this.scene.add(backWallMesh);
 
-    // Bank Vault Round Door Model (Center at x = 19.9, y = 6.5, z = 0)
+    // Bank Vault Round Door Model (Center at z = -24.8, y = 6.5, x = 0)
     const doorGroup = new THREE.Group();
-    doorGroup.position.set(19.8, 6.5, 0);
-    doorGroup.rotation.y = -Math.PI / 2;
+    doorGroup.position.set(0, 6.5, -24.8);
 
-    const doorRingGeom = new THREE.TorusGeometry(5.0, 0.4, 16, 48);
+    const doorRingGeom = new THREE.TorusGeometry(5.2, 0.45, 16, 48);
     const doorRingMesh = new THREE.Mesh(doorRingGeom, this.materials.steel);
     doorGroup.add(doorRingMesh);
 
-    const doorCenterGeom = new THREE.CylinderGeometry(4.6, 4.6, 0.4, 32);
+    const doorCenterGeom = new THREE.CylinderGeometry(4.8, 4.8, 0.4, 32);
     const doorCenterMesh = new THREE.Mesh(doorCenterGeom, this.materials.gold);
     doorCenterMesh.rotation.x = Math.PI / 2;
     doorGroup.add(doorCenterMesh);
 
     this.scene.add(doorGroup);
 
-    // 3. Bright Studio 4-Point Lighting (NO pitch black areas!)
-    const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+    // 3. Bright 4-Point Studio Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 1.25);
     this.scene.add(ambient);
 
-    // Main Sun Key Light
+    // Main Sun Key Light Downfield
     const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
-    sunLight.position.set(-5, 20, 15);
+    sunLight.position.set(10, 20, 10);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     this.scene.add(sunLight);
 
-    // Spotlight on Slingshot
+    // Foreground Spotlight on Slingshot
     const slingshotSpot = new THREE.SpotLight(0x00f0ff, 3.5);
-    slingshotSpot.position.set(-14, 14, 8);
+    slingshotSpot.position.set(0, 14, 18);
     slingshotSpot.target = this.launcherManager.launcherGroup;
     this.scene.add(slingshotSpot);
 
-    // Warm Gold Spotlight on Vault Tower
-    const towerSpot = new THREE.SpotLight(0xffd700, 3.5);
-    towerSpot.position.set(4, 16, 12);
-    towerSpot.target.position.set(8, 3, 0);
+    // Warm Gold Spotlight on Target Brick Tower Downfield
+    const towerSpot = new THREE.SpotLight(0xffd700, 3.8);
+    towerSpot.position.set(0, 18, -4);
+    towerSpot.target.position.set(0, 3, -14);
     this.scene.add(towerSpot);
 
     // Side Hazard Orange Fill Light
     const fillLight = new THREE.PointLight(0xff3300, 2.5, 45);
-    fillLight.position.set(16, 10, 8);
+    fillLight.position.set(12, 8, -14);
     this.scene.add(fillLight);
   }
 
@@ -187,11 +185,13 @@ export class GameScene {
       const deltaX = clientX - this.dragStartPos.x;
       const deltaY = clientY - this.dragStartPos.y;
 
-      const pullDist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      const power = Math.min(1.0, pullDist / 160);
+      // Dragging DOWN increases pull tension power (+z towards camera)
+      const pullDist = Math.max(0, deltaY);
+      const power = Math.min(1.0, Math.max(0.15, pullDist / 160));
 
-      const yaw = (deltaX / 200) * (Math.PI / 3.5);
-      const pitch = 0.15 + (deltaY / 160) * (Math.PI / 3);
+      // Dragging LEFT/RIGHT adjusts yaw angle
+      const yaw = -(deltaX / 180) * (Math.PI / 3.5);
+      const pitch = 0.15 + (Math.max(0, -deltaY) / 160) * (Math.PI / 3.5);
 
       this.launcherManager.setAim(pitch, yaw, power);
       this.soundEngine.playStretch(power);
@@ -234,7 +234,7 @@ export class GameScene {
     this.accumulatedMultiplier = 0;
     this.soundEngine.resetCombo();
 
-    // Reset Camera Position
+    // Reset Camera Position Behind Slingshot
     this.targetCamPos.copy(this.defaultCamPos);
     this.targetCamLook.copy(this.defaultCamLook);
 
@@ -243,7 +243,7 @@ export class GameScene {
     // Calculate Provably Fair Math outcome for round
     this.currentRoundResult = this.provablyFair.calculateRound(mode);
 
-    // Build Vault Tower structure
+    // Build Vault Tower structure downfield
     this.structureManager.buildVaultStructure(mode, this.currentRoundResult.targetHitCount);
     this.launcherManager.clearActiveProjectile();
     this.launcherManager.setTrajectoryVisible(true);
@@ -261,9 +261,9 @@ export class GameScene {
     this.soundEngine.playLaunch(isBomb);
     this.launcherManager.launch(isBomb);
 
-    // Camera track downfield toward target tower
-    this.targetCamPos.set(-2.0, 6.5, 14.0);
-    this.targetCamLook.set(7.5, 3.0, 0);
+    // Camera follow forward downfield toward target bricks
+    this.targetCamPos.set(0, 4.5, 2.0);
+    this.targetCamLook.set(0, 2.5, -14.0);
 
     // Safety fallback timer to resolve round if physics gets stuck
     this.safetyTimer = window.setTimeout(() => {
@@ -285,13 +285,13 @@ export class GameScene {
     const projPos = this.launcherManager.activeProjectileMesh?.position;
     if (!projPos) return;
 
-    // Camera dynamic flight tracking
+    // Camera dynamic flight tracking (following behind projectile downfield -z)
     this.targetCamPos.set(
-      Math.min(5.0, projPos.x - 5.5),
-      Math.max(4.0, projPos.y + 2.5),
-      projPos.z + 4.5
+      projPos.x * 0.5,
+      Math.max(3.5, projPos.y + 2.2),
+      Math.max(-10.0, projPos.z + 5.5)
     );
-    this.targetCamLook.set(projPos.x + 3.0, projPos.y, projPos.z);
+    this.targetCamLook.set(projPos.x, projPos.y, projPos.z - 4.0);
 
     // Rocket exhaust smoke trail
     this.particleSystem.spawnRocketExhaust(projPos);
@@ -301,7 +301,7 @@ export class GameScene {
       if (block.isDestroyed) return;
 
       const dist = block.mesh.position.distanceTo(projPos);
-      if (dist < 1.3) {
+      if (dist < 1.35) {
         // Block Impact!
         block.health--;
         this.soundEngine.playImpact();
@@ -311,7 +311,6 @@ export class GameScene {
           block.isDestroyed = true;
           this.scene.remove(block.mesh);
 
-          // Calculate payout value
           let gainedMult = block.multiplierValue;
           
           if (this.currentRoundResult) {
@@ -382,14 +381,14 @@ export class GameScene {
       }
     });
 
-    // Back wall & ground collision settling check
+    // Back wall (-z = -24.5) & ground collision settling check
     const vel = this.launcherManager.activeProjectileBody.velocity;
     const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
 
     if (!this.roundFinishPending) {
-      if (projPos.x >= 19.2 || projPos.y < 0.35 || projPos.x < -18 || (speed < 0.3 && projPos.x > 0)) {
-        if (projPos.x >= 19.0) {
-          // Impact with Far Back Wall!
+      if (projPos.z <= -24.0 || projPos.y < 0.35 || projPos.z > 15 || (speed < 0.3 && projPos.z < 0)) {
+        if (projPos.z <= -24.0) {
+          // Impact with Far Back Vault Wall!
           this.soundEngine.playImpact(2.0);
           this.particleSystem.spawnExplosion(projPos, 15);
           this.addScreenShake(0.25);
