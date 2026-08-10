@@ -1,6 +1,6 @@
 /**
  * Main 3D WebGL Game Scene Orchestrator for Vault Heist
- * Manages Three.js rendering, camera trajectory tracking, back wall impact, and round lifecycle.
+ * Features Angry Balls behind-slingshot camera framing, flight tracking, and screen shake.
  */
 
 import * as THREE from 'three';
@@ -42,24 +42,27 @@ export class GameScene {
   private safetyTimer: number | null = null;
 
   // Camera Target Interpolation
-  private defaultCamPos = new THREE.Vector3(-5.0, 6.5, 18.0);
-  private defaultCamLook = new THREE.Vector3(4.0, 2.5, 0);
-  private targetCamPos = new THREE.Vector3(-5.0, 6.5, 18.0);
-  private targetCamLook = new THREE.Vector3(4.0, 2.5, 0);
-  private currentCamLook = new THREE.Vector3(4.0, 2.5, 0);
+  private defaultCamPos = new THREE.Vector3(-12.5, 3.8, 2.2);
+  private defaultCamLook = new THREE.Vector3(5.0, 2.5, 0);
+  private targetCamPos = new THREE.Vector3(-12.5, 3.8, 2.2);
+  private targetCamLook = new THREE.Vector3(5.0, 2.5, 0);
+  private currentCamLook = new THREE.Vector3(5.0, 2.5, 0);
+
+  // Screen Shake Intensity
+  private shakeIntensity: number = 0;
 
   // UI Callback hooks
   public onMultiplierUpdate?: (mult: number) => void;
   public onRoundComplete?: (result: RoundResult, finalMult: number) => void;
 
   private isDragging: boolean = false;
-  private previousMousePosition = { x: 0, y: 0 };
+  private dragStartPos = { x: 0, y: 0 };
   private clock = new THREE.Clock();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
 
-    // 1. Renderer Setup
+    // 1. WebGL Renderer Setup
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -70,16 +73,16 @@ export class GameScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // 2. Scene & Camera
+    // 2. Scene & Camera Setup
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0c10);
-    this.scene.fog = new THREE.FogExp2(0x0a0c10, 0.025);
+    this.scene.background = new THREE.Color(0x080a10);
+    this.scene.fog = new THREE.FogExp2(0x080a10, 0.02);
 
-    this.camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 120);
+    this.camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 150);
     this.camera.position.copy(this.defaultCamPos);
     this.camera.lookAt(this.defaultCamLook);
 
-    // 3. Modules Initialization
+    // 3. Modules Setup
     this.materials = createVaultMaterials();
     this.physicsWorld = new PhysicsWorld();
     this.physicsWorld.createGround();
@@ -95,61 +98,62 @@ export class GameScene {
     this.setupEnvironment();
     this.setupInteractions();
 
-    // Build initial tower
     this.resetRound(this.currentMode);
-
-    // Resize Handler
     window.addEventListener('resize', this.onWindowResize.bind(this));
-
-    // Start Render Loop
     this.animate();
   }
 
   private setupEnvironment(): void {
-    // 1. Extended Ground Mesh
-    const floorGeom = new THREE.PlaneGeometry(70, 50);
+    // Polished Reflective Metallic Floor
+    const floorGeom = new THREE.PlaneGeometry(80, 60);
     const floorMesh = new THREE.Mesh(floorGeom, this.materials.floor);
     floorMesh.rotation.x = -Math.PI / 2;
     floorMesh.position.set(5, 0, 0);
     floorMesh.receiveShadow = true;
     this.scene.add(floorMesh);
 
-    // 2. Far Back Wall (Target Wall at Far Side of Field at x = 20)
-    const backWallGeom = new THREE.PlaneGeometry(50, 25);
+    // Far Back Target Wall (at x = 20)
+    const backWallGeom = new THREE.PlaneGeometry(60, 30);
     const backWallMat = new THREE.MeshStandardMaterial({
-      color: 0x161a24,
-      roughness: 0.7,
+      color: 0x141824,
+      roughness: 0.6,
       metalness: 0.5
     });
     const backWallMesh = new THREE.Mesh(backWallGeom, backWallMat);
     backWallMesh.rotation.y = -Math.PI / 2;
-    backWallMesh.position.set(20, 12.5, 0);
+    backWallMesh.position.set(20, 15, 0);
     backWallMesh.receiveShadow = true;
     this.scene.add(backWallMesh);
 
-    // Grid lines on back wall
-    const gridHelper = new THREE.GridHelper(50, 25, 0x00f0ff, 0x112233);
+    // Cyberpunk Security Laser Grid Lines on Back Wall
+    const gridHelper = new THREE.GridHelper(60, 30, 0x00f0ff, 0x0a1525);
     gridHelper.rotation.z = Math.PI / 2;
-    gridHelper.position.set(19.9, 12.5, 0);
+    gridHelper.position.set(19.9, 15, 0);
     this.scene.add(gridHelper);
 
-    // Ambient Light
-    const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+    // Ambient Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 0.7);
     this.scene.add(ambient);
 
+    // Slingshot Cyan Spotlight
+    const slingshotSpot = new THREE.SpotLight(0x00f0ff, 2.5);
+    slingshotSpot.position.set(-14, 12, 6);
+    slingshotSpot.target = this.launcherManager.launcherGroup;
+    this.scene.add(slingshotSpot);
+
     // Key Spotlight on Target Tower & Back Wall
-    const keySpot = new THREE.SpotLight(0x00f0ff, 3.0);
-    keySpot.position.set(2, 16, 12);
-    keySpot.target.position.set(8, 2, 0);
+    const keySpot = new THREE.SpotLight(0x00ffff, 3.5);
+    keySpot.position.set(2, 18, 12);
+    keySpot.target.position.set(8, 3, 0);
     keySpot.castShadow = true;
     keySpot.shadow.mapSize.width = 1024;
     keySpot.shadow.mapSize.height = 1024;
     this.scene.add(keySpot);
     this.scene.add(keySpot.target);
 
-    // Hazard Orange Side Fill Light
-    const fillLight = new THREE.PointLight(0xff3b00, 2.0, 30);
-    fillLight.position.set(16, 8, 5);
+    // Hazard Orange Fill Light
+    const fillLight = new THREE.PointLight(0xff3b00, 2.2, 35);
+    fillLight.position.set(16, 8, 6);
     this.scene.add(fillLight);
   }
 
@@ -159,7 +163,7 @@ export class GameScene {
       this.isDragging = true;
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-      this.previousMousePosition = { x: clientX, y: clientY };
+      this.dragStartPos = { x: clientX, y: clientY };
     };
 
     const onMove = (e: MouseEvent | TouchEvent) => {
@@ -167,22 +171,26 @@ export class GameScene {
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-      const deltaX = clientX - this.previousMousePosition.x;
-      const deltaY = clientY - this.previousMousePosition.y;
+      const deltaX = clientX - this.dragStartPos.x;
+      const deltaY = clientY - this.dragStartPos.y;
 
-      const currentAim = this.launcherManager.aimState;
-      const newPitch = currentAim.pitch + deltaY * 0.005;
-      const newYaw = currentAim.yaw + deltaX * 0.005;
-      const newPower = currentAim.power;
+      // Drag distance converts to tension power & pitch/yaw angle adjustment
+      const pullDist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      const power = Math.min(1.0, pullDist / 200);
 
-      this.launcherManager.setAim(newPitch, newYaw, newPower);
-      this.soundEngine.playStretch(newPower);
+      const yaw = (deltaX / 250) * (Math.PI / 3.5);
+      const pitch = 0.15 + (deltaY / 200) * (Math.PI / 3);
 
-      this.previousMousePosition = { x: clientX, y: clientY };
+      this.launcherManager.setAim(pitch, yaw, power);
+      this.soundEngine.playStretch(power);
     };
 
     const onUp = () => {
-      this.isDragging = false;
+      if (this.isDragging && this.isAiming && !this.isRoundInFlight) {
+        this.isDragging = false;
+        // Releasing touch/mouse fires the shot!
+        this.fireShot();
+      }
     };
 
     this.canvas.addEventListener('mousedown', onDown);
@@ -215,7 +223,7 @@ export class GameScene {
     this.accumulatedMultiplier = 0;
     this.soundEngine.resetCombo();
 
-    // Reset Camera Position
+    // Reset Camera Position Behind Slingshot
     this.targetCamPos.copy(this.defaultCamPos);
     this.targetCamLook.copy(this.defaultCamLook);
 
@@ -224,7 +232,7 @@ export class GameScene {
     // Calculate Provably Fair Math outcome for round
     this.currentRoundResult = this.provablyFair.calculateRound(mode);
 
-    // Build Vault Tower structure matching result requirements
+    // Build Vault Tower structure
     this.structureManager.buildVaultStructure(mode, this.currentRoundResult.targetHitCount);
     this.launcherManager.clearActiveProjectile();
     this.launcherManager.setTrajectoryVisible(true);
@@ -242,10 +250,6 @@ export class GameScene {
     this.soundEngine.playLaunch(isBomb);
     this.launcherManager.launch(isBomb);
 
-    // Camera track downfield toward target tower & back wall
-    this.targetCamPos.set(0.0, 5.5, 15.0);
-    this.targetCamLook.set(7.5, 3.0, 0);
-
     // Safety fallback timer to resolve round if physics gets stuck
     this.safetyTimer = window.setTimeout(() => {
       if (this.isRoundInFlight) {
@@ -256,11 +260,23 @@ export class GameScene {
     return true;
   }
 
+  public addScreenShake(intensity: number): void {
+    this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+  }
+
   private checkCollisions(): void {
     if (!this.isRoundInFlight || !this.launcherManager.activeProjectileBody) return;
 
     const projPos = this.launcherManager.activeProjectileMesh?.position;
     if (!projPos) return;
+
+    // Camera dynamic flight tracking (follow projectile from behind)
+    this.targetCamPos.set(
+      Math.min(6.0, projPos.x - 6.5),
+      Math.max(3.5, projPos.y + 2.0),
+      projPos.z + 4.5
+    );
+    this.targetCamLook.set(projPos.x + 3.0, projPos.y, projPos.z);
 
     // Spawn rocket exhaust smoke trail
     this.particleSystem.spawnRocketExhaust(projPos);
@@ -274,6 +290,7 @@ export class GameScene {
         // Block Impact!
         block.health--;
         this.soundEngine.playImpact();
+        this.addScreenShake(0.1);
 
         if (block.health <= 0) {
           block.isDestroyed = true;
@@ -282,7 +299,6 @@ export class GameScene {
           // Calculate payout value
           let gainedMult = block.multiplierValue;
           
-          // Cap total to calculated Provably Fair outcome
           if (this.currentRoundResult) {
             const remainingTarget = Math.max(0, this.currentRoundResult.multiplier - this.accumulatedMultiplier);
             gainedMult = Math.min(gainedMult, remainingTarget);
@@ -300,7 +316,7 @@ export class GameScene {
             }
           }
 
-          // Particles
+          // Particles & Explosions
           if (block.type === 'glass') {
             this.soundEngine.playGlassShatter();
             this.particleSystem.spawnGlassShards(block.mesh.position);
@@ -309,8 +325,10 @@ export class GameScene {
           } else if (block.type === 'tnt') {
             this.soundEngine.playExplosion();
             this.particleSystem.spawnExplosion(block.mesh.position);
+            this.addScreenShake(0.35);
+
             const blastCenter = block.mesh.position.clone();
-            this.physicsWorld.applyExplosionImpulse(blastCenter, 9, 50);
+            this.physicsWorld.applyExplosionImpulse(blastCenter, 9, 55);
 
             // Explosive blast wave damages & collects adjacent blocks
             this.structureManager.blocks.forEach(adjBlock => {
@@ -359,6 +377,7 @@ export class GameScene {
           // Impact with Far Back Wall!
           this.soundEngine.playImpact(2.0);
           this.particleSystem.spawnExplosion(projPos, 15);
+          this.addScreenShake(0.25);
         }
         this.roundFinishPending = true;
         this.finishTimer = window.setTimeout(() => {
@@ -376,7 +395,7 @@ export class GameScene {
     this.cancelTimers();
     this.isRoundInFlight = false;
 
-    // The final round multiplier is STRICTLY what the player physically hit & collected during flight!
+    // Payout is strictly what player physically hit & collected during flight!
     const finalMult = Math.round(this.accumulatedMultiplier * 100) / 100;
 
     if (finalMult >= 10) {
@@ -399,12 +418,20 @@ export class GameScene {
 
     const dt = Math.min(this.clock.getDelta(), 0.1);
 
-    // Smooth Camera Motion Interpolation
-    this.camera.position.lerp(this.targetCamPos, dt * 3.0);
-    this.currentCamLook.lerp(this.targetCamLook, dt * 3.0);
+    // Smooth Camera Flight Tracking
+    this.camera.position.lerp(this.targetCamPos, dt * 3.5);
+    this.currentCamLook.lerp(this.targetCamLook, dt * 3.5);
+
+    // Apply Screen Shake
+    if (this.shakeIntensity > 0) {
+      this.camera.position.x += (Math.random() - 0.5) * this.shakeIntensity;
+      this.camera.position.y += (Math.random() - 0.5) * this.shakeIntensity;
+      this.shakeIntensity = Math.max(0, this.shakeIntensity - dt * 1.5);
+    }
+
     this.camera.lookAt(this.currentCamLook);
 
-    // Physics step
+    // Physics & Animation Step
     this.physicsWorld.step(dt);
     this.structureManager.update();
     this.launcherManager.update();
