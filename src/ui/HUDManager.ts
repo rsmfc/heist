@@ -151,8 +151,9 @@ export class HUDManager {
     this.modeBombBtn.classList.toggle('active', mode === 'bomb');
     this.modeMaxBtn.classList.toggle('active', mode === 'max_vault');
 
-    this.updateBetCostDisplay();
     this.gameScene.resetRound(mode);
+    this.fireBtn.disabled = false;
+    this.updateBetCostDisplay();
   }
 
   public updateBetCostDisplay(): void {
@@ -167,24 +168,27 @@ export class HUDManager {
   }
 
   public triggerFire(): void {
-    if (this.gameScene.isRoundInFlight) return;
+    if (!this.gameScene.isAiming || this.gameScene.isRoundInFlight) return;
 
     const totalCost = this.calculateBetCost();
     if (this.balance < totalCost) {
       alert('Insufficient balance! Resetting balance to $1,000.00');
       this.balance = 1000.00;
       this.updateUI();
-      return;
     }
 
     // Deduct Bet Cost
     this.balance -= totalCost;
     this.updateUI();
 
-    this.fireBtn.disabled = true;
-    this.fireBtn.innerText = 'FIRING...';
-
-    this.gameScene.fireShot();
+    const fired = this.gameScene.fireShot();
+    if (fired) {
+      this.fireBtn.disabled = true;
+      this.fireBtn.innerText = 'FIRING...';
+    } else {
+      this.fireBtn.disabled = false;
+      this.updateBetCostDisplay();
+    }
   }
 
   private handleRoundComplete(_result: RoundResult, finalMult: number): void {
@@ -209,13 +213,13 @@ export class HUDManager {
     }
 
     this.updateUI();
-    this.fireBtn.disabled = false;
-    this.updateBetCostDisplay();
 
-    // Automatically prepare next round
+    // Reset round and re-enable button cleanly
     setTimeout(() => {
       this.gameScene.resetRound(this.selectedMode);
-    }, 1500);
+      this.fireBtn.disabled = false;
+      this.updateBetCostDisplay();
+    }, 800);
   }
 
   private renderHistory(): void {

@@ -37,6 +37,10 @@ export class GameScene {
   public currentRoundResult: RoundResult | null = null;
   public accumulatedMultiplier: number = 0;
 
+  private roundFinishPending: boolean = false;
+  private finishTimer: number | null = null;
+  private safetyTimer: number | null = null;
+
   // UI Callback hooks
   public onMultiplierUpdate?: (mult: number) => void;
   public onRoundComplete?: (result: RoundResult, finalMult: number) => void;
@@ -174,7 +178,21 @@ export class GameScene {
     window.addEventListener('touchend', onUp);
   }
 
+  private cancelTimers(): void {
+    if (this.finishTimer !== null) {
+      clearTimeout(this.finishTimer);
+      this.finishTimer = null;
+    }
+    if (this.safetyTimer !== null) {
+      clearTimeout(this.safetyTimer);
+      this.safetyTimer = null;
+    }
+    this.roundFinishPending = false;
+  }
+
   public resetRound(mode: GameMode): void {
+    this.cancelTimers();
+
     this.currentMode = mode;
     this.isAiming = true;
     this.isRoundInFlight = false;
@@ -192,9 +210,10 @@ export class GameScene {
     this.launcherManager.setTrajectoryVisible(true);
   }
 
-  public fireShot(): void {
-    if (!this.isAiming || this.isRoundInFlight || !this.currentRoundResult) return;
+  public fireShot(): boolean {
+    if (!this.isAiming || this.isRoundInFlight || !this.currentRoundResult) return false;
 
+    this.cancelTimers();
     this.isAiming = false;
     this.isRoundInFlight = true;
     this.launcherManager.setTrajectoryVisible(false);
@@ -203,12 +222,14 @@ export class GameScene {
     this.soundEngine.playLaunch(isBomb);
     this.launcherManager.launch(isBomb);
 
-    // Auto round resolution safety timer
-    setTimeout(() => {
+    // Safety fallback timer to resolve round if physics gets stuck
+    this.safetyTimer = window.setTimeout(() => {
       if (this.isRoundInFlight) {
         this.finishRound();
       }
-    }, 6000);
+    }, 4500);
+
+    return true;
   }
 
   private checkCollisions(): void {
@@ -272,16 +293,26 @@ export class GameScene {
       }
     });
 
-    // Out of bounds / stop check
-    if (projPos.y < 0.2 || projPos.x > 20 || projPos.x < -15) {
-      setTimeout(() => {
-        if (this.isRoundInFlight) this.finishRound();
-      }, 500);
+    // Velocity & boundary settling check
+    const vel = this.launcherManager.activeProjectileBody.velocity;
+    const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+
+    if (!this.roundFinishPending) {
+      if (projPos.y < 0.35 || projPos.x > 22 || projPos.x < -15 || (speed < 0.3 && projPos.x > 0)) {
+        this.roundFinishPending = true;
+        this.finishTimer = window.setTimeout(() => {
+          if (this.isRoundInFlight) {
+            this.finishRound();
+          }
+        }, 700);
+      }
     }
   }
 
   private finishRound(): void {
     if (!this.isRoundInFlight || !this.currentRoundResult) return;
+
+    this.cancelTimers();
     this.isRoundInFlight = false;
 
     // Ensure final accumulated multiplier aligns with mathematical provably fair payout result
