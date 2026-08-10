@@ -68,16 +68,16 @@ export class VaultStructureManager {
 
         const rand = Math.random();
         if (mode === 'max_vault') {
-          if (rand > 0.7) type = 'diamond';
-          else if (rand > 0.4) type = 'gold';
-          else if (rand > 0.25) type = 'tnt';
-          else if (rand > 0.1) type = 'steel';
+          if (rand > 0.75) type = 'diamond';
+          else if (rand > 0.5) type = 'gold';
+          else if (rand > 0.35) type = 'tnt';
+          else if (rand > 0.2) type = 'steel';
           else type = 'glass';
         } else if (mode === 'bomb') {
           if (rand > 0.8) type = 'tnt';
-          else if (rand > 0.55) type = 'gold';
-          else if (rand > 0.35) type = 'steel';
-          else if (rand > 0.15) type = 'glass';
+          else if (rand > 0.6) type = 'gold';
+          else if (rand > 0.4) type = 'steel';
+          else if (rand > 0.2) type = 'glass';
           else type = 'concrete';
         } else {
           // Standard Mode
@@ -109,47 +109,47 @@ export class VaultStructureManager {
     let mass = 3.0;
     let mat = this.materials.concrete;
     let health = 2;
-    let multiplierValue = 0.2;
+    let multiplierValue = 0.0; // Default zero multiplier for structural blocks
 
     switch (type) {
       case 'glass':
         mat = this.materials.glass;
         mass = 0.8;
         health = 1;
-        multiplierValue = 0.25;
+        multiplierValue = 0.0; // Glass breaks visually with 0 payout
         break;
       case 'steel':
         mat = this.materials.steel;
         mass = 5.0;
         health = 3;
-        multiplierValue = 0.5;
+        multiplierValue = 0.0;
         break;
       case 'gold':
         mat = this.materials.gold;
         size = new THREE.Vector3(0.9, 0.7, 0.9);
         mass = 3.5;
         health = 1;
-        multiplierValue = 2.0;
+        multiplierValue = 1.0; // Treasure collectible awards multiplier
         break;
       case 'diamond':
         mat = this.materials.diamond;
         size = new THREE.Vector3(0.85, 0.85, 0.85);
         mass = 4.0;
         health = 2;
-        multiplierValue = 10.0;
+        multiplierValue = 5.0; // High value vault collectible
         break;
       case 'tnt':
         mat = this.materials.tnt;
         size = new THREE.Vector3(0.9, 1.1, 0.9);
         mass = 1.5;
         health = 1;
-        multiplierValue = 1.0;
+        multiplierValue = 0.0; // TNT triggers blast wave
         break;
       default: // Concrete
         mat = this.materials.concrete;
         mass = 3.0;
         health = 2;
-        multiplierValue = 0.15;
+        multiplierValue = 0.0;
         break;
     }
 
