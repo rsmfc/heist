@@ -1,6 +1,6 @@
 /**
  * Main 3D WebGL Game Scene Orchestrator for Vault Heist
- * Manages Three.js rendering, lighting, camera controls, collision events, and round resolution.
+ * Manages Three.js rendering, camera trajectory tracking, back wall impact, and round lifecycle.
  */
 
 import * as THREE from 'three';
@@ -41,6 +41,13 @@ export class GameScene {
   private finishTimer: number | null = null;
   private safetyTimer: number | null = null;
 
+  // Camera Target Interpolation
+  private defaultCamPos = new THREE.Vector3(-5.0, 6.5, 18.0);
+  private defaultCamLook = new THREE.Vector3(4.0, 2.5, 0);
+  private targetCamPos = new THREE.Vector3(-5.0, 6.5, 18.0);
+  private targetCamLook = new THREE.Vector3(4.0, 2.5, 0);
+  private currentCamLook = new THREE.Vector3(4.0, 2.5, 0);
+
   // UI Callback hooks
   public onMultiplierUpdate?: (mult: number) => void;
   public onRoundComplete?: (result: RoundResult, finalMult: number) => void;
@@ -66,11 +73,11 @@ export class GameScene {
     // 2. Scene & Camera
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0a0c10);
-    this.scene.fog = new THREE.FogExp2(0x0a0c10, 0.035);
+    this.scene.fog = new THREE.FogExp2(0x0a0c10, 0.025);
 
-    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-    this.camera.position.set(-6, 4, 12);
-    this.camera.lookAt(2, 2, 0);
+    this.camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 120);
+    this.camera.position.copy(this.defaultCamPos);
+    this.camera.lookAt(this.defaultCamLook);
 
     // 3. Modules Initialization
     this.materials = createVaultMaterials();
@@ -99,31 +106,40 @@ export class GameScene {
   }
 
   private setupEnvironment(): void {
-    // Ground Mesh
-    const floorGeom = new THREE.PlaneGeometry(50, 50);
+    // 1. Extended Ground Mesh
+    const floorGeom = new THREE.PlaneGeometry(70, 50);
     const floorMesh = new THREE.Mesh(floorGeom, this.materials.floor);
     floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.set(5, 0, 0);
     floorMesh.receiveShadow = true;
     this.scene.add(floorMesh);
 
-    // Vault Back Wall with Security Grid Light Effect
-    const wallGeom = new THREE.PlaneGeometry(50, 20);
-    const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x121620,
-      roughness: 0.8,
-      metalness: 0.4
+    // 2. Far Back Wall (Target Wall at Far Side of Field at x = 20)
+    const backWallGeom = new THREE.PlaneGeometry(50, 25);
+    const backWallMat = new THREE.MeshStandardMaterial({
+      color: 0x161a24,
+      roughness: 0.7,
+      metalness: 0.5
     });
-    const wallMesh = new THREE.Mesh(wallGeom, wallMat);
-    wallMesh.position.set(0, 10, -10);
-    this.scene.add(wallMesh);
+    const backWallMesh = new THREE.Mesh(backWallGeom, backWallMat);
+    backWallMesh.rotation.y = -Math.PI / 2;
+    backWallMesh.position.set(20, 12.5, 0);
+    backWallMesh.receiveShadow = true;
+    this.scene.add(backWallMesh);
+
+    // Grid lines on back wall
+    const gridHelper = new THREE.GridHelper(50, 25, 0x00f0ff, 0x112233);
+    gridHelper.rotation.z = Math.PI / 2;
+    gridHelper.position.set(19.9, 12.5, 0);
+    this.scene.add(gridHelper);
 
     // Ambient Light
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.65);
     this.scene.add(ambient);
 
-    // Key Spotlight on Target Tower
-    const keySpot = new THREE.SpotLight(0x00f0ff, 2.5);
-    keySpot.position.set(2, 14, 10);
+    // Key Spotlight on Target Tower & Back Wall
+    const keySpot = new THREE.SpotLight(0x00f0ff, 3.0);
+    keySpot.position.set(2, 16, 12);
     keySpot.target.position.set(8, 2, 0);
     keySpot.castShadow = true;
     keySpot.shadow.mapSize.width = 1024;
@@ -132,8 +148,8 @@ export class GameScene {
     this.scene.add(keySpot.target);
 
     // Hazard Orange Side Fill Light
-    const fillLight = new THREE.PointLight(0xff3b00, 1.8, 25);
-    fillLight.position.set(12, 6, 4);
+    const fillLight = new THREE.PointLight(0xff3b00, 2.0, 30);
+    fillLight.position.set(16, 8, 5);
     this.scene.add(fillLight);
   }
 
@@ -199,6 +215,10 @@ export class GameScene {
     this.accumulatedMultiplier = 0;
     this.soundEngine.resetCombo();
 
+    // Reset Camera Position
+    this.targetCamPos.copy(this.defaultCamPos);
+    this.targetCamLook.copy(this.defaultCamLook);
+
     if (this.onMultiplierUpdate) this.onMultiplierUpdate(0);
 
     // Calculate Provably Fair Math outcome for round
@@ -221,6 +241,10 @@ export class GameScene {
     const isBomb = this.currentMode === 'bomb' || this.currentMode === 'max_vault';
     this.soundEngine.playLaunch(isBomb);
     this.launcherManager.launch(isBomb);
+
+    // Camera track downfield toward target tower & back wall
+    this.targetCamPos.set(0.0, 5.5, 15.0);
+    this.targetCamLook.set(7.5, 3.0, 0);
 
     // Safety fallback timer to resolve round if physics gets stuck
     this.safetyTimer = window.setTimeout(() => {
@@ -260,10 +284,8 @@ export class GameScene {
           
           // Cap total to calculated Provably Fair outcome
           if (this.currentRoundResult) {
-            const remainingTarget = this.currentRoundResult.multiplier - this.accumulatedMultiplier;
-            if (remainingTarget > 0) {
-              gainedMult = Math.min(gainedMult, remainingTarget);
-            }
+            const remainingTarget = Math.max(0, this.currentRoundResult.multiplier - this.accumulatedMultiplier);
+            gainedMult = Math.min(gainedMult, remainingTarget);
           }
 
           if (gainedMult > 0) {
@@ -327,18 +349,23 @@ export class GameScene {
       }
     });
 
-    // Velocity & boundary settling check
+    // Back wall & ground collision settling check (Back wall is at x = 19.5)
     const vel = this.launcherManager.activeProjectileBody.velocity;
     const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
 
     if (!this.roundFinishPending) {
-      if (projPos.y < 0.35 || projPos.x > 22 || projPos.x < -15 || (speed < 0.3 && projPos.x > 0)) {
+      if (projPos.x >= 19.2 || projPos.y < 0.35 || projPos.x < -18 || (speed < 0.3 && projPos.x > 0)) {
+        if (projPos.x >= 19.0) {
+          // Impact with Far Back Wall!
+          this.soundEngine.playImpact(2.0);
+          this.particleSystem.spawnExplosion(projPos, 15);
+        }
         this.roundFinishPending = true;
         this.finishTimer = window.setTimeout(() => {
           if (this.isRoundInFlight) {
             this.finishRound();
           }
-        }, 700);
+        }, 600);
       }
     }
   }
@@ -371,6 +398,11 @@ export class GameScene {
     requestAnimationFrame(this.animate.bind(this));
 
     const dt = Math.min(this.clock.getDelta(), 0.1);
+
+    // Smooth Camera Motion Interpolation
+    this.camera.position.lerp(this.targetCamPos, dt * 3.0);
+    this.currentCamLook.lerp(this.targetCamLook, dt * 3.0);
+    this.camera.lookAt(this.currentCamLook);
 
     // Physics step
     this.physicsWorld.step(dt);
