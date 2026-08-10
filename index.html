@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VAULT HEIST 3D | Arcade Casino Slingshot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- 3D Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Top Navigation Header -->
+  <header class="hud-header">
+    <div class="brand">
+      <div class="logo-icon">🔓</div>
+      <div class="brand-text">
+        <span class="title">VAULT HEIST</span>
+        <span class="badge">3D ARCADE</span>
+      </div>
+    </div>
+
+    <!-- Multiplier History Strip -->
+    <div class="history-strip">
+      <span class="history-label">RECENT:</span>
+      <div id="history-container" class="history-badges"></div>
+    </div>
+
+    <!-- Balance & Top Actions -->
+    <div class="header-right">
+      <div class="balance-box">
+        <span class="balance-title">BALANCE</span>
+        <span id="balance-val" class="balance-amount">$1,000.00</span>
+      </div>
+
+      <div class="header-actions">
+        <button id="toggle-audio" class="icon-btn" title="Toggle Sound">🔊 AUDIO</button>
+        <button id="toggle-music" class="icon-btn" title="Toggle Music">🎶 MUSIC</button>
+        <button id="open-paytable-btn" class="icon-btn">📜 PAYTABLE</button>
+        <button id="open-pf-btn" class="icon-btn pf-btn">🛡️ PROVABLY FAIR</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Center Live Multiplier HUD -->
+  <div class="multiplier-hud">
+    <div class="multiplier-label">ROUND MULTIPLIER</div>
+    <div id="current-multiplier" class="multiplier-value">0.00x</div>
+    <div class="payout-estimate">WIN PAYOUT: <span id="payout-value" class="payout-highlight">$0.00</span></div>
+  </div>
+
+  <!-- Bottom Control Bar -->
+  <footer class="hud-footer">
+    <div class="control-panel">
+      <!-- Mode Selector Pills -->
+      <div class="mode-selector">
+        <button id="mode-standard" class="mode-btn active">
+          <span class="mode-title">🔷 STANDARD</span>
+          <span class="mode-desc">1x Bet • Base Towers</span>
+        </button>
+        <button id="mode-bomb" class="mode-btn bomb">
+          <span class="mode-title">💣 SUPER BOMB</span>
+          <span class="mode-desc">25x Buy • Explosive TNT</span>
+        </button>
+        <button id="mode-max" class="mode-btn max">
+          <span class="mode-title">💎 MAX VAULT</span>
+          <span class="mode-desc">100x Buy • Up to 37,168x</span>
+        </button>
+      </div>
+
+      <!-- Bet Input & Action Row -->
+      <div class="bet-action-row">
+        <!-- Bet Calculator -->
+        <div class="bet-controls">
+          <label class="input-label">BASE BET ($)</label>
+          <div class="input-group">
+            <input id="bet-input" type="number" step="0.50" min="0.10" max="100.00" value="1.00" />
+            <button id="bet-half" class="sub-btn">½</button>
+            <button id="bet-double" class="sub-btn">2x</button>
+            <button id="bet-max" class="sub-btn">MAX</button>
+          </div>
+          <div class="presets-row">
+            <button class="preset-btn" data-val="0.10">$0.10</button>
+            <button class="preset-btn" data-val="1.00">$1.00</button>
+            <button class="preset-btn" data-val="5.00">$5.00</button>
+            <button class="preset-btn" data-val="10.00">$10.00</button>
+            <button class="preset-btn" data-val="50.00">$50.00</button>
+          </div>
+        </div>
+
+        <!-- Fire Button -->
+        <div class="action-btn-wrapper">
+          <button id="fire-btn" class="fire-button">
+            BLAST VAULT ($1.00)
+          </button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal 1: Provably Fair -->
+  <div id="pf-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🛡️ Provably Fair Verification</h3>
+        <button id="close-pf-btn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="pf-info">Every round is mathematically verifiable using HMAC-SHA256 crypto seeds.</p>
+        
+        <div class="form-group">
+          <label>Active Server Seed Hash (SHA-256):</label>
+          <div id="pf-hash" class="code-box">----------------------------------------------------------------</div>
+        </div>
+
+        <div class="form-group">
+          <label>Client Seed (Editable):</label>
+          <div class="flex-row">
+            <input id="client-seed-input" type="text" value="player_heist_seed_12345" />
+            <button id="save-client-seed-btn" class="secondary-btn">UPDATE</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Current Nonce (Round Counter):</label>
+          <div id="pf-nonce" class="code-box">1</div>
+        </div>
+
+        <hr class="divider" />
+        <h4>Independent Verification Calculator</h4>
+        <div class="form-group">
+          <input id="verify-server-seed" type="text" placeholder="Server Unhashed Seed" />
+        </div>
+        <div class="form-group">
+          <input id="verify-client-seed" type="text" placeholder="Client Seed" />
+        </div>
+        <div class="form-group flex-row">
+          <input id="verify-nonce" type="number" value="1" placeholder="Nonce" />
+          <select id="verify-mode">
+            <option value="standard">Standard</option>
+            <option value="bomb">Bomb Mode (25x)</option>
+            <option value="max_vault">Max Vault (100x)</option>
+          </select>
+          <button id="verify-calc-btn" class="secondary-btn">VERIFY</button>
+        </div>
+        <div id="verify-result" class="verify-output">Result: Pending</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Paytable -->
+  <div id="paytable-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📜 Symbol Paytable & Mechanics</h3>
+        <button id="close-paytable-btn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="paytable-grid">
+          <div class="pay-item">
+            <div class="pay-icon" style="background:#222630;">🧱</div>
+            <div class="pay-info">
+              <strong>Concrete Pillar</strong>
+              <span>HP: 2 | Base Multiplier: +0.15x</span>
+            </div>
+          </div>
+          <div class="pay-item">
+            <div class="pay-icon" style="background:#8a95a5;">🛡️</div>
+            <div class="pay-info">
+              <strong>Brushed Steel Beam</strong>
+              <span>HP: 3 | Base Multiplier: +0.50x</span>
+            </div>
+          </div>
+          <div class="pay-item">
+            <div class="pay-icon" style="background:#a0e0ff;">🪟</div>
+            <div class="pay-info">
+              <strong>Security Glass Window</strong>
+              <span>HP: 1 | Shatters | Base Multiplier: +0.25x</span>
+            </div>
+          </div>
+          <div class="pay-item">
+            <div class="pay-icon" style="background:#ffd700; color:#000;">💰</div>
+            <div class="pay-info">
+              <strong>Gold Bullion Stack</strong>
+              <span>HP: 1 | High Value: +2.00x - +5.00x</span>
+            </div>
+          </div>
+          <div class="pay-item">
+            <div class="pay-icon" style="background:#00f0ff; color:#000;">💎</div>
+            <div class="pay-info">
+              <strong>Diamond Safe</strong>
+              <span>HP: 2 | Mega Value: +10.00x - +50.00x</span>
+            </div>
+          </div>
+          <div class="pay-item">
+            <div class="pay-icon" style="background:#ff3b00;">💣</div>
+            <div class="pay-info">
+              <strong>Hazard TNT Barrel</strong>
+              <span>HP: 1 | 3D Blast Wave Explosive Chain Reaction</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
