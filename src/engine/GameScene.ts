@@ -287,7 +287,41 @@ export class GameScene {
           } else if (block.type === 'tnt') {
             this.soundEngine.playExplosion();
             this.particleSystem.spawnExplosion(block.mesh.position);
-            this.physicsWorld.applyExplosionImpulse(block.mesh.position, 9, 50);
+            const blastCenter = block.mesh.position.clone();
+            this.physicsWorld.applyExplosionImpulse(blastCenter, 9, 50);
+
+            // Explosive blast wave damages & collects adjacent blocks
+            this.structureManager.blocks.forEach(adjBlock => {
+              if (adjBlock.isDestroyed || adjBlock.id === block.id) return;
+              const d = adjBlock.mesh.position.distanceTo(blastCenter);
+              if (d < 5.0) {
+                adjBlock.health -= 2;
+                if (adjBlock.health <= 0) {
+                  adjBlock.isDestroyed = true;
+                  this.scene.remove(adjBlock.mesh);
+
+                  let gainedMult = adjBlock.multiplierValue;
+                  if (this.currentRoundResult) {
+                    const remainingTarget = Math.max(0, this.currentRoundResult.multiplier - this.accumulatedMultiplier);
+                    gainedMult = Math.min(gainedMult, remainingTarget);
+                  }
+
+                  if (gainedMult > 0) {
+                    this.accumulatedMultiplier += gainedMult;
+                    this.accumulatedMultiplier = Math.round(this.accumulatedMultiplier * 100) / 100;
+                    this.soundEngine.playCoinCollect(this.accumulatedMultiplier);
+                    this.floatingTextManager.spawnText(adjBlock.mesh.position, gainedMult, adjBlock.type === 'diamond');
+                    if (this.onMultiplierUpdate) this.onMultiplierUpdate(this.accumulatedMultiplier);
+                  }
+
+                  if (adjBlock.type === 'glass') {
+                    this.particleSystem.spawnGlassShards(adjBlock.mesh.position);
+                  } else if (adjBlock.type === 'gold' || adjBlock.type === 'diamond') {
+                    this.particleSystem.spawnGoldExplosion(adjBlock.mesh.position);
+                  }
+                }
+              }
+            });
           }
         }
       }
@@ -315,8 +349,8 @@ export class GameScene {
     this.cancelTimers();
     this.isRoundInFlight = false;
 
-    // Ensure final accumulated multiplier aligns with mathematical provably fair payout result
-    const finalMult = Math.max(this.accumulatedMultiplier, this.currentRoundResult.multiplier);
+    // The final round multiplier is STRICTLY what the player physically hit & collected during flight!
+    const finalMult = Math.round(this.accumulatedMultiplier * 100) / 100;
 
     if (finalMult >= 10) {
       this.soundEngine.playBigWin();
