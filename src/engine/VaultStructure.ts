@@ -1,6 +1,6 @@
 /**
  * Destructible 3D Vault Tower Builder for Vault Heist
- * Procedurally generates rigid body towers comprised of Concrete, Glass, Steel, Gold, Safes, and TNT.
+ * Builds highly detailed, visually distinct 3D blocks with bevels, trims, and high contrast.
  */
 
 import * as THREE from 'three';
@@ -14,7 +14,7 @@ export type BlockType = 'concrete' | 'steel' | 'glass' | 'gold' | 'diamond' | 't
 export interface VaultBlock {
   id: string;
   type: BlockType;
-  mesh: THREE.Mesh;
+  mesh: THREE.Group; // Group containing detailed sub-meshes (block + trims + decals)
   body: CANNON.Body;
   health: number;
   maxHealth: number;
@@ -57,33 +57,32 @@ export class VaultStructureManager {
     const cols = mode === 'max_vault' ? 4 : 3;
 
     for (let level = 0; level < levels; level++) {
-      const y = level * 1.05 + 0.55;
+      const y = level * 1.1 + 0.6;
 
       for (let c = 0; c < cols; c++) {
-        const x = startX + c * 1.1;
+        const x = startX + c * 1.15;
         const z = startZ + (Math.random() - 0.5) * 0.4;
 
-        // Determine block type based on mode & height
         let type: BlockType = 'concrete';
 
         const rand = Math.random();
         if (mode === 'max_vault') {
-          if (rand > 0.75) type = 'diamond';
-          else if (rand > 0.5) type = 'gold';
-          else if (rand > 0.35) type = 'tnt';
-          else if (rand > 0.2) type = 'steel';
+          if (rand > 0.72) type = 'diamond';
+          else if (rand > 0.48) type = 'gold';
+          else if (rand > 0.32) type = 'tnt';
+          else if (rand > 0.18) type = 'steel';
           else type = 'glass';
         } else if (mode === 'bomb') {
-          if (rand > 0.8) type = 'tnt';
-          else if (rand > 0.6) type = 'gold';
-          else if (rand > 0.4) type = 'steel';
-          else if (rand > 0.2) type = 'glass';
+          if (rand > 0.78) type = 'tnt';
+          else if (rand > 0.55) type = 'gold';
+          else if (rand > 0.35) type = 'steel';
+          else if (rand > 0.18) type = 'glass';
           else type = 'concrete';
         } else {
           // Standard Mode
-          if (rand > 0.85) type = 'gold';
-          else if (rand > 0.65) type = 'steel';
-          else if (rand > 0.4) type = 'glass';
+          if (rand > 0.82) type = 'gold';
+          else if (rand > 0.62) type = 'steel';
+          else if (rand > 0.38) type = 'glass';
           else type = 'concrete';
         }
 
@@ -98,70 +97,157 @@ export class VaultStructureManager {
 
     // Add extra capstone high-value vault on top
     if (mode === 'max_vault') {
-      this.spawnBlock('diamond', new THREE.Vector3(startX + 1.6, levels * 1.05 + 0.6, 0));
+      this.spawnBlock('diamond', new THREE.Vector3(startX + 1.7, levels * 1.1 + 0.6, 0));
     }
   }
 
   private spawnBlock(type: BlockType, pos: THREE.Vector3): VaultBlock {
     const id = `block_${++this.blockIdCounter}`;
 
+    const blockGroup = new THREE.Group();
+    blockGroup.position.copy(pos);
+
     let size = new THREE.Vector3(1.0, 1.0, 1.0);
     let mass = 3.0;
-    let mat = this.materials.concrete;
     let health = 2;
-    let multiplierValue = 0.0; // Default zero multiplier for structural blocks
+    let multiplierValue = 0.0;
 
     switch (type) {
-      case 'glass':
-        mat = this.materials.glass;
-        mass = 0.8;
-        health = 1;
-        multiplierValue = 0.0; // Glass breaks visually with 0 payout
+      case 'concrete': {
+        mass = 3.5;
+        health = 2;
+        multiplierValue = 0.0;
+
+        // Base Concrete Block
+        const geom = new THREE.BoxGeometry(1.0, 1.0, 1.0);
+        const mainMesh = new THREE.Mesh(geom, this.materials.concrete);
+        mainMesh.castShadow = true;
+        mainMesh.receiveShadow = true;
+        blockGroup.add(mainMesh);
+
+        // Steel Bevel Edges
+        const edgeGeom = new THREE.BoxGeometry(1.04, 0.08, 1.04);
+        const topEdge = new THREE.Mesh(edgeGeom, this.materials.steel);
+        topEdge.position.y = 0.46;
+        const botEdge = new THREE.Mesh(edgeGeom, this.materials.steel);
+        botEdge.position.y = -0.46;
+        blockGroup.add(topEdge);
+        blockGroup.add(botEdge);
         break;
-      case 'steel':
-        mat = this.materials.steel;
-        mass = 5.0;
+      }
+
+      case 'steel': {
+        mass = 5.5;
         health = 3;
         multiplierValue = 0.0;
+
+        // Brushed Steel Pillar
+        const geom = new THREE.BoxGeometry(0.95, 1.0, 0.95);
+        const mainMesh = new THREE.Mesh(geom, this.materials.steel);
+        mainMesh.castShadow = true;
+        mainMesh.receiveShadow = true;
+        blockGroup.add(mainMesh);
+
+        // Dark Cross-Brace Grid
+        const braceGeom = new THREE.BoxGeometry(0.98, 0.12, 0.98);
+        const midBrace = new THREE.Mesh(braceGeom, this.materials.concrete);
+        blockGroup.add(midBrace);
         break;
-      case 'gold':
-        mat = this.materials.gold;
-        size = new THREE.Vector3(0.9, 0.7, 0.9);
+      }
+
+      case 'glass': {
+        mass = 0.8;
+        health = 1;
+        multiplierValue = 0.0;
+
+        // Crystal Glass Pane
+        const geom = new THREE.BoxGeometry(0.95, 1.0, 0.95);
+        const mainMesh = new THREE.Mesh(geom, this.materials.glass);
+        mainMesh.castShadow = true;
+        blockGroup.add(mainMesh);
+
+        // White Specular Frame
+        const frameGeom = new THREE.BoxGeometry(0.98, 0.98, 0.98);
+        const frameMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+        const frameMesh = new THREE.Mesh(frameGeom, frameMat);
+        blockGroup.add(frameMesh);
+        break;
+      }
+
+      case 'gold': {
+        size = new THREE.Vector3(0.9, 0.75, 0.9);
         mass = 3.5;
         health = 1;
-        multiplierValue = 1.0; // Treasure collectible awards multiplier
+        multiplierValue = 1.0;
+
+        // Shiny Gold Block
+        const geom = new THREE.BoxGeometry(size.x, size.y, size.z);
+        const mainMesh = new THREE.Mesh(geom, this.materials.gold);
+        mainMesh.castShadow = true;
+        blockGroup.add(mainMesh);
+
+        // Gold Bullion Bar Trims
+        const barGeom = new THREE.BoxGeometry(size.x * 0.8, 0.15, size.z * 0.8);
+        const barMesh = new THREE.Mesh(barGeom, this.materials.goldDecal);
+        barMesh.position.y = size.y / 2 + 0.05;
+        blockGroup.add(barMesh);
         break;
-      case 'diamond':
-        mat = this.materials.diamond;
+      }
+
+      case 'diamond': {
         size = new THREE.Vector3(0.85, 0.85, 0.85);
         mass = 4.0;
         health = 2;
-        multiplierValue = 5.0; // High value vault collectible
+        multiplierValue = 5.0;
+
+        // Cyan Diamond Vault Box
+        const geom = new THREE.BoxGeometry(size.x, size.y, size.z);
+        const mainMesh = new THREE.Mesh(geom, this.materials.diamond);
+        mainMesh.castShadow = true;
+        blockGroup.add(mainMesh);
+
+        // Glowing Inner Core
+        const coreGeom = new THREE.OctahedronGeometry(0.28, 0);
+        const coreMesh = new THREE.Mesh(coreGeom, this.materials.diamondCore);
+        blockGroup.add(coreMesh);
         break;
-      case 'tnt':
-        mat = this.materials.tnt;
-        size = new THREE.Vector3(0.9, 1.1, 0.9);
+      }
+
+      case 'tnt': {
+        size = new THREE.Vector3(0.9, 1.15, 0.9);
         mass = 1.5;
         health = 1;
-        multiplierValue = 0.0; // TNT triggers blast wave
-        break;
-      default: // Concrete
-        mat = this.materials.concrete;
-        mass = 3.0;
-        health = 2;
         multiplierValue = 0.0;
+
+        // Hazard Red Cylinder
+        const geom = new THREE.CylinderGeometry(size.x / 2, size.x / 2, size.y, 16);
+        const mainMesh = new THREE.Mesh(geom, this.materials.tnt);
+        mainMesh.castShadow = true;
+        blockGroup.add(mainMesh);
+
+        // Yellow Danger Stripes
+        const stripeGeom = new THREE.CylinderGeometry(size.x / 2 + 0.02, size.x / 2 + 0.02, 0.18, 16);
+        const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffea00, roughness: 0.3 });
+        const stripeTop = new THREE.Mesh(stripeGeom, stripeMat);
+        stripeTop.position.y = 0.3;
+        const stripeBot = new THREE.Mesh(stripeGeom, stripeMat);
+        stripeBot.position.y = -0.3;
+        blockGroup.add(stripeTop);
+        blockGroup.add(stripeBot);
+
+        // Yellow Fuse Top
+        const fuseGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.25, 8);
+        const fuseMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const fuseMesh = new THREE.Mesh(fuseGeom, fuseMat);
+        fuseMesh.position.y = size.y / 2 + 0.1;
+        blockGroup.add(fuseMesh);
         break;
+      }
     }
 
-    // 1. Create Three.js Mesh
-    const geom = type === 'tnt' ? new THREE.CylinderGeometry(size.x / 2, size.x / 2, size.y, 16) : new THREE.BoxGeometry(size.x, size.y, size.z);
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.copy(pos);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    this.scene.add(mesh);
+    this.scene.add(blockGroup);
 
-    // 2. Create Cannon-es Physics Body
+    // Create Cannon-es Physics Body
     const shape = type === 'tnt'
       ? new CANNON.Cylinder(size.x / 2, size.x / 2, size.y, 16)
       : new CANNON.Box(new CANNON.Vec3(size.x / 2, size.y / 2, size.z / 2));
@@ -176,7 +262,7 @@ export class VaultStructureManager {
     const block: VaultBlock = {
       id,
       type,
-      mesh,
+      mesh: blockGroup,
       body,
       health,
       maxHealth: health,

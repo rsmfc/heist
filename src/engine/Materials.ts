@@ -1,6 +1,6 @@
 /**
- * Materials & Shaders for Vault Heist 3D Engine
- * Configures AAA PBR metallic, glass transmission, hazard, and emissive materials.
+ * Vibrant AAA PBR Materials for Vault Heist 3D Engine
+ * High contrast, glossy reflections, emissive neon highlights, and crisp visibility.
  */
 
 import * as THREE from 'three';
@@ -17,87 +17,92 @@ export interface VaultMaterials {
   floor: THREE.MeshStandardMaterial;
   laserTrajectory: THREE.LineBasicMaterial;
   aimMarker: THREE.MeshBasicMaterial;
+  slingshotBand: THREE.LineBasicMaterial;
+  goldDecal: THREE.MeshStandardMaterial;
+  diamondCore: THREE.MeshBasicMaterial;
 }
 
 export function createVaultMaterials(): VaultMaterials {
-  // 1. Concrete / Dark Carbon Beam
+  // 1. High-Contrast Concrete (Bright Slate Blue-Grey)
   const concrete = new THREE.MeshStandardMaterial({
-    color: 0x222630,
-    roughness: 0.7,
+    color: 0x434c5e,
+    roughness: 0.5,
     metalness: 0.3
   });
 
-  // 2. Brushed Reinforced Steel
+  // 2. Polished Chrome Steel
   const steel = new THREE.MeshStandardMaterial({
-    color: 0x8a95a5,
-    roughness: 0.25,
-    metalness: 0.85
+    color: 0xe5e9f0,
+    roughness: 0.15,
+    metalness: 0.95
   });
 
-  // 3. Security Glass (PBR Physical Transmission Material)
+  // 3. Crystal Security Glass (Vibrant Translucent Cyan)
   const glass = new THREE.MeshPhysicalMaterial({
-    color: 0xa0e0ff,
+    color: 0x88c0d0,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.6,
     roughness: 0.1,
-    metalness: 0.1,
-    transmission: 0.85,
-    ior: 1.5
+    metalness: 0.2,
+    transmission: 0.75,
+    ior: 1.5,
+    emissive: 0x003344,
+    emissiveIntensity: 0.25
   });
 
-  // 4. Gold Bullion Stack
+  // 4. Brilliant Gold Bullion
   const gold = new THREE.MeshStandardMaterial({
     color: 0xffd700,
-    roughness: 0.15,
-    metalness: 0.95,
-    emissive: 0x443300,
-    emissiveIntensity: 0.2
+    roughness: 0.12,
+    metalness: 0.98,
+    emissive: 0x664400,
+    emissiveIntensity: 0.3
   });
 
-  // 5. Diamond Hard Drive / High Value Safe
+  // 5. Glowing Quantum Diamond Safe
   const diamond = new THREE.MeshStandardMaterial({
     color: 0x00f0ff,
     roughness: 0.1,
     metalness: 0.9,
-    emissive: 0x006699,
-    emissiveIntensity: 0.4
-  });
-
-  // 6. Hazard TNT Explosive Barrel
-  const tnt = new THREE.MeshStandardMaterial({
-    color: 0xff3b00,
-    roughness: 0.4,
-    metalness: 0.2,
-    emissive: 0x881100,
-    emissiveIntensity: 0.3
-  });
-
-  // 7. Standard Thermal Drill Projectile
-  const projectile = new THREE.MeshStandardMaterial({
-    color: 0x334455,
-    roughness: 0.2,
-    metalness: 0.8,
-    emissive: 0x00aaee,
-    emissiveIntensity: 0.3
-  });
-
-  // 8. Super Bomb Warhead Projectile
-  const bombProjectile = new THREE.MeshStandardMaterial({
-    color: 0xff2200,
-    roughness: 0.2,
-    metalness: 0.8,
-    emissive: 0xff5500,
+    emissive: 0x0088cc,
     emissiveIntensity: 0.6
   });
 
-  // 9. Metallic Floor Grid
-  const floor = new THREE.MeshStandardMaterial({
-    color: 0x11141a,
-    roughness: 0.6,
-    metalness: 0.5
+  // 6. Hazard TNT Barrel (Vibrant Red & Orange)
+  const tnt = new THREE.MeshStandardMaterial({
+    color: 0xff1100,
+    roughness: 0.3,
+    metalness: 0.2,
+    emissive: 0x880000,
+    emissiveIntensity: 0.4
   });
 
-  // 10. Trajectory Glowing Laser Arc Line
+  // 7. Carbon Drill Rocket Projectile
+  const projectile = new THREE.MeshStandardMaterial({
+    color: 0x2e3440,
+    roughness: 0.2,
+    metalness: 0.9,
+    emissive: 0x0088ff,
+    emissiveIntensity: 0.4
+  });
+
+  // 8. Glowing Magma Super Bomb Projectile
+  const bombProjectile = new THREE.MeshStandardMaterial({
+    color: 0xff3300,
+    roughness: 0.2,
+    metalness: 0.8,
+    emissive: 0xff6600,
+    emissiveIntensity: 0.8
+  });
+
+  // 9. Cyberpunk Reflective Floor Tiles
+  const floor = new THREE.MeshStandardMaterial({
+    color: 0x181e2a,
+    roughness: 0.3,
+    metalness: 0.6
+  });
+
+  // 10. Trajectory Arc Line
   const laserTrajectory = new THREE.LineBasicMaterial({
     color: 0x00ffff,
     linewidth: 3,
@@ -105,9 +110,29 @@ export function createVaultMaterials(): VaultMaterials {
     opacity: 0.85
   });
 
-  // 11. Aim Point Marker
+  // 11. Aim Marker
   const aimMarker = new THREE.MeshBasicMaterial({
     color: 0x00ffff,
+    transparent: true,
+    opacity: 0.9
+  });
+
+  // 12. Slingshot Band (Glowing Cyan)
+  const slingshotBand = new THREE.LineBasicMaterial({
+    color: 0x00ffff,
+    linewidth: 6
+  });
+
+  // 13. Gold Decal / Gold Trim
+  const goldDecal = new THREE.MeshStandardMaterial({
+    color: 0xffea00,
+    metalness: 1.0,
+    roughness: 0.05
+  });
+
+  // 14. Diamond Inner Core
+  const diamondCore = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
     transparent: true,
     opacity: 0.9
   });
@@ -123,6 +148,9 @@ export function createVaultMaterials(): VaultMaterials {
     bombProjectile,
     floor,
     laserTrajectory,
-    aimMarker
+    aimMarker,
+    slingshotBand,
+    goldDecal,
+    diamondCore
   };
 }
